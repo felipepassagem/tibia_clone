@@ -19,7 +19,7 @@ extends CharacterBody2D
 
 const TILE_SIZE := 32
 @export var tiles_per_second := 6.0
-const DIAG_FACTOR := 0.5 # 1/sqrt(2) pra não ficar mais rápido na diagonal
+const DIAG_FACTOR := 0.5 
 @export var speed_mult: float = 1.0 
 
 var is_moving := false
@@ -110,6 +110,8 @@ func _ready() -> void:
 	# atualiza visibilidade pelo FOV (se existir controller)
 	if fov_controller != null:
 		fov_controller.update_visibility(self)
+	_dbg_contract("READY")
+
 		
 func get_input_dir8() -> Vector2:
 	var x := int(Input.is_action_pressed("ui_right")) - int(Input.is_action_pressed("ui_left"))
@@ -320,29 +322,32 @@ func _world_pos_is_blocked(world_pos: Vector2) -> bool:
 			return true
 
 	return false
-
-
-func _can_step(dir: Vector2) -> bool:
 	
-	var dest := global_position + (dir * TILE_SIZE)
-	print("[STEP] dir=", dir, " dest=", dest, " blocked_dest=", _world_pos_is_blocked(dest))
-	# Regra 1: se destino bloqueado -> não anda
-	if _world_pos_is_blocked(dest):
-		return false
+#func get_global_z() -> int:
+	#var pf := get_parent() as CanvasItem
+	#return (pf.z_index if pf != null else 0) + z_index
 
-	# Regra 2 (anti corner-cutting): só bloqueia diagonal se OS DOIS lados ortogonais estiverem bloqueados
-	if dir.x != 0 and dir.y != 0:
-		var side_x := global_position + Vector2(dir.x * TILE_SIZE, 0)
-		var side_y := global_position + Vector2(0, dir.y * TILE_SIZE)
-
-		var bx := _world_pos_is_blocked(side_x)
-		var by := _world_pos_is_blocked(side_y)
-
-		# Se ambos bloqueados, impede “passar pelo canto”
-		if bx and by:
-			return false
-
-	return true
+#func _can_step(dir: Vector2) -> bool:
+	#
+	#var dest := global_position + (dir * TILE_SIZE)
+	#print("[STEP] dir=", dir, " dest=", dest, " blocked_dest=", _world_pos_is_blocked(dest))
+	## Regra 1: se destino bloqueado -> não anda
+	#if _world_pos_is_blocked(dest):
+		#return false
+#
+	## Regra 2 (anti corner-cutting): só bloqueia diagonal se OS DOIS lados ortogonais estiverem bloqueados
+	#if dir.x != 0 and dir.y != 0:
+		#var side_x := global_position + Vector2(dir.x * TILE_SIZE, 0)
+		#var side_y := global_position + Vector2(0, dir.y * TILE_SIZE)
+#
+		#var bx := _world_pos_is_blocked(side_x)
+		#var by := _world_pos_is_blocked(side_y)
+#
+		## Se ambos bloqueados, impede “passar pelo canto”
+		#if bx and by:
+			#return false
+#
+	#return true
 
 # ============================================================
 # FLOORS DISCOVERY / CURRENT FLOOR
@@ -561,7 +566,9 @@ func change_floor(delta: int) -> void:
 	if fov_controller != null:
 		fov_controller.update_visibility(self)
 
-	print("[FLOOR] changed -> current_floor=", current_floor, " z=", z_index, " mask_layers=", _bits_to_layers(collision_mask))
+	#print("[FLOOR] changed -> current_floor=", current_floor, " z=", z_index, " mask_layers=", _bits_to_layers(collision_mask))
+	_dbg_contract("AFTER_CHANGE_FLOOR")
+
 
 	
 
@@ -637,6 +644,15 @@ func _get_current_floor_index() -> int:
 		return -1
 	return floor_manager.get_floor_index_for_global_z(get_global_z())
 
+func _dbg_contract(tag: String) -> void:
+	var pf := get_parent() as CanvasItem
+	print("[CONTRACT:", tag, "] parent=", (pf.name if pf else "NULL"),
+		" pf.z=", (pf.z_index if pf else -99999),
+		" player.z=", z_index,
+		" global_z=", get_global_z(),
+		" floor_logical=", current_floor,
+		" mask_layers=", _bits_to_layers(collision_mask),
+		" visual_parent=", (player_visual.get_parent().name if player_visual and player_visual.get_parent() else "NULL"))
 
 
 

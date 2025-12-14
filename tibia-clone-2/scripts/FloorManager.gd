@@ -65,29 +65,53 @@ func get_floors() -> Array:
 func get_floor_index_for_global_z(global_z: int) -> int:
 	if floors.is_empty():
 		refresh_floors()
-
 	if floors.is_empty():
-		#print("[FloorManager] Nenhum floor carregado")
 		return -1
 
-	var closest_idx := -1
-	var closest_diff := INF
+	var best_idx := -1
+	var best_z := -INF
 
-	for i in floors.size():
+	for i in range(floors.size()):
 		var f := floors[i] as CanvasItem
-		var diff: float = abs(float(f.z_index - global_z))
+		var z := f.z_index
 
-		if diff < closest_diff:
-			closest_diff = diff
-			closest_idx = i
+		if z <= global_z and z > best_z:
+			best_z = z
+			best_idx = i
 
-	if closest_idx == -1:
-		print("[FloorManager] Não foi possível determinar floor para z=", global_z)
-	else:
-		var f := floors[closest_idx] as CanvasItem
-		#print("[FloorManager] Floor atual:", f.name, " z=", f.z_index)
+	# se global_z estiver abaixo do menor floor, cai no 0
+	if best_idx == -1:
+		best_idx = 0
 
-	return closest_idx
+	return best_idx
+
+
+#func get_floor_index_for_global_z(global_z: int) -> int:
+	#if floors.is_empty():
+		#refresh_floors()
+#
+	#if floors.is_empty():
+		##print("[FloorManager] Nenhum floor carregado")
+		#return -1
+#
+	#var closest_idx := -1
+	#var closest_diff := INF
+#
+	#for i in floors.size():
+		#var f := floors[i] as CanvasItem
+		#var diff: float = abs(float(f.z_index - global_z))
+#
+		#if diff < closest_diff:
+			#closest_diff = diff
+			#closest_idx = i
+#
+	#if closest_idx == -1:
+		#print("[FloorManager] Não foi possível determinar floor para z=", global_z)
+	#else:
+		#var f := floors[closest_idx] as CanvasItem
+		##print("[FloorManager] Floor atual:", f.name, " z=", f.z_index)
+#
+	#return closest_idx
 	
 func change_floor_for_player(
 	player: CharacterBody2D,
@@ -136,15 +160,51 @@ func change_floor_for_player(
 
 	
 
-func ensure_visual_on_current_floor(
-	player: Node,
-	player_visual: Node2D,
-	remote_to_visual: RemoteTransform2D
-) -> void:
-	if player_visual == null or player == null:
+#func ensure_visual_on_current_floor(
+	#player: Node,
+	#player_visual: Node2D,
+	#remote_to_visual: RemoteTransform2D
+#) -> void:
+	#if player_visual == null or player == null:
+		#return
+#
+	## ✅ z global real do player = floor(z) + z local do player
+	#var pf := player.get_parent() as CanvasItem
+	#var player_global_z: int = (pf.z_index if pf != null else 0) + int(player.get("z_index"))
+#
+	#var idx := get_floor_index_for_global_z(player_global_z)
+	#if idx == -1:
+		#return
+#
+	#var target_floor: Node = floors[idx] as Node
+	#if player_visual.get_parent() == target_floor:
+		## ainda garante render correto
+		#player_visual.z_index = int(player_visual.global_position.y)
+		#return
+#
+	#var old_global := player_visual.global_position
+#
+	#var old_parent := player_visual.get_parent()
+	#if old_parent != null:
+		#old_parent.remove_child(player_visual)
+#
+	#target_floor.add_child(player_visual)
+	#player_visual.global_position = old_global
+#
+	## ✅ evita ficar “por baixo” do tilemap após trocar de andar
+	##player_visual.z_index = int(player_visual.global_position.y)
+#
+	#if remote_to_visual != null:
+		#remote_to_visual.remote_path = player_visual.get_path()
+#
+	#player_visual.visible = true
+	#if target_floor is CanvasItem:
+		#(target_floor as CanvasItem).visible = true
+		
+func ensure_visual_on_current_floor(player: Node, player_visual: Node2D, remote_to_visual: RemoteTransform2D) -> void:
+	if player == null or player_visual == null:
 		return
 
-	# ✅ z global real do player = floor(z) + z local do player
 	var pf := player.get_parent() as CanvasItem
 	var player_global_z: int = (pf.z_index if pf != null else 0) + int(player.get("z_index"))
 
@@ -153,22 +213,13 @@ func ensure_visual_on_current_floor(
 		return
 
 	var target_floor: Node = floors[idx] as Node
-	if player_visual.get_parent() == target_floor:
-		# ainda garante render correto
-		player_visual.z_index = int(player_visual.global_position.y)
-		return
-
-	var old_global := player_visual.global_position
-
-	var old_parent := player_visual.get_parent()
-	if old_parent != null:
-		old_parent.remove_child(player_visual)
-
-	target_floor.add_child(player_visual)
-	player_visual.global_position = old_global
-
-	# ✅ evita ficar “por baixo” do tilemap após trocar de andar
-	#player_visual.z_index = int(player_visual.global_position.y)
+	if player_visual.get_parent() != target_floor:
+		var old_global := player_visual.global_position
+		var old_parent := player_visual.get_parent()
+		if old_parent != null:
+			old_parent.remove_child(player_visual)
+		target_floor.add_child(player_visual)
+		player_visual.global_position = old_global
 
 	if remote_to_visual != null:
 		remote_to_visual.remote_path = player_visual.get_path()
@@ -176,6 +227,7 @@ func ensure_visual_on_current_floor(
 	player_visual.visible = true
 	if target_floor is CanvasItem:
 		(target_floor as CanvasItem).visible = true
+
 
 func set_floors_above_visible_by_player(
 	player: CanvasItem,
