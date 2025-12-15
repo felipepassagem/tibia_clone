@@ -36,17 +36,17 @@ func tick_physics(delta: float) -> void:
 	if dir != Vector2.ZERO:
 		_start_step(dir)
 		
-func _physics_process(delta: float) -> void:
-	var m = get_node_or_null("Movement")
-	if m == null:
-		#print("[PLAYER] Movement NULL no physics")
-		return
+#func _physics_process(delta: float) -> void:
+	#var m = get_node_or_null("Movement")
+	#if m == null:
+		##print("[PLAYER] Movement NULL no physics")
+		#return
 
-	if not m.has_method("tick_physics"):
-		#print("[PLAYER] Movement sem tick_physics. Script errado/anexado?")
-		return
-
-	m.tick_physics(delta)
+	#if not m.has_method("tick_physics"):
+		##print("[PLAYER] Movement sem tick_physics. Script errado/anexado?")
+		#return
+#
+	#m.tick_physics(delta)
 
 # ----------------------------
 # INPUT DIR (8 direções)
@@ -118,9 +118,10 @@ func _move_towards_target(delta: float) -> void:
 		if player.has_method("_anim_play_idle"):
 			player._anim_play_idle(player.last_dir)
 
-		if player.fov_controller != null:
-			player.fov_controller.update_visibility(player)
-		return
+		#if player.fov_controller != null:
+			#player.fov_controller.update_visibility(player)
+
+		return  # ✅ obrigatório
 
 	player.global_position += to_target.normalized() * step_px
 

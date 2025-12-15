@@ -30,3 +30,8 @@ static func cell_is_wall(tm: Node, cell: Vector2i) -> bool:
 	if td == null:
 		return false
 	return td.get_custom_data("is_wall") == true
+	
+static func cell_for_tm_world(tm: Node, world_pos: Vector2) -> Vector2i:
+	var tm2d := tm as Node2D
+	var local_pos := tm2d.to_local(world_pos)
+	return tm.local_to_map(local_pos)

@@ -141,7 +141,14 @@ func change_floor_for_player(
 		return -1
 
 	var new_floor := floors[new_idx] as CanvasItem
+	var old_floor := floors[old_idx] as CanvasItem
+	#var new_floor := floors[new_idx] as CanvasItem
 
+	# ✅ COMPENSA O OFFSET VISUAL ENTRE FLOORS (ex: 0,0 / -32,-32 / +32,+32)
+	var delta_off: Vector2 = (new_floor as Node2D).global_position - (old_floor as Node2D).global_position
+	player.global_position += delta_off
+	if "target_position" in player:
+		player.target_position += delta_off
 	# ✅ muda o player de floor de verdade
 	if player.get_parent() != new_floor:
 		player.get_parent().remove_child(player)
@@ -285,3 +292,31 @@ func get_current_floor_z_for_player(player: CanvasItem) -> int:
 	if idx == -1:
 		return player.z_index
 	return (floors[idx] as CanvasItem).z_index
+	
+	
+func set_floors_visible_from_z(from_floor_z: int, visible: bool, player_visual: Node2D = null) -> void:
+	if floors.is_empty():
+		refresh_floors()
+	if floors.is_empty():
+		return
+
+	var visual_floor: CanvasItem = null
+	if player_visual != null and player_visual.get_parent() is CanvasItem:
+		visual_floor = player_visual.get_parent() as CanvasItem
+
+	for f in floors:
+		var ci := f as CanvasItem
+
+		if ci.z_index >= from_floor_z:
+			if visual_floor != null and ci == visual_floor:
+				ci.visible = true
+			else:
+				ci.visible = visible
+		else:
+			ci.visible = true
+
+	if player_visual != null:
+		player_visual.visible = true
+		if visual_floor != null:
+			visual_floor.visible = true
+			

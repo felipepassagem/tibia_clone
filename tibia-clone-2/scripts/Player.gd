@@ -15,7 +15,7 @@ extends CharacterBody2D
 @onready var floor_manager: FloorManager = get_node_or_null(floor_manager_path)
 
 @export var fov_controller_path: NodePath
-@onready var fov_controller: FovController = get_node_or_null(fov_controller_path)
+@onready var fov_controller: Node = get_node_or_null(fov_controller_path)
 
 const TILE_SIZE := 32
 @export var tiles_per_second := 6.0
@@ -108,8 +108,8 @@ func _ready() -> void:
 		print("[PLAYER] AVISO: não consegui detectar floor inicial pelo z_index=", z_index)
 
 	# atualiza visibilidade pelo FOV (se existir controller)
-	if fov_controller != null:
-		fov_controller.update_visibility(self)
+	#if fov_controller != null:
+		#fov_controller.update_visibility(self)
 	_dbg_contract("READY")
 
 		
@@ -272,6 +272,13 @@ func _input(event: InputEvent) -> void:
 			KEY_PAGEUP:
 				print("[INPUT] PgUp -> subir andar")
 				change_floor(+1)
+			KEY_L:
+				if fov_controller != null:
+					fov_controller.debug_is_wall_around_player(self)
+				else:
+					print("[FOV] fov_controller NULL")
+			KEY_K:
+				debug_sqm_position()
 
 
 # ============================================================
@@ -397,38 +404,38 @@ func _cell_has_any_tile(tm: Node, cell: Vector2i) -> bool:
 # FOV DETECTION (qualquer tile acima)
 # ============================================================
 
-func fov_has_any_tile_above() -> bool:
-	var floors := _get_floors()
-	if floors.is_empty():
-		return false
-
-	var idx := _get_current_floor_index()
-	if idx == -1:
-		return false
-
-	var player_floor := floors[idx] as CanvasItem
-	var player_z: int = player_floor.z_index
-
-	# 1) Filtra o FOV pelo is_wall do ANDAR ATUAL
-	var fov_offsets := get_filtered_fov_offsets_by_walls()
-
-	# 2) Procura tiles acima APENAS nesses offsets permitidos
-	for f in floors:
-		var floor_ci := f as CanvasItem
-		if floor_ci.z_index <= player_z:
-			continue
-
-		var tms := _get_tilemaps_in_floor(floor_ci)
-		for tm in tms:
-			var center := _center_cell_for_tm(tm)
-
-			for off in fov_offsets:
-				var cell: Vector2i = center + off
-				if _cell_has_any_tile(tm, cell):
-					print("[FOV_HAS] HIT -> floor=", floor_ci.name, " tm=", tm.name, " off=", off, " cell=", cell)
-					return true
-
-	return false
+#func fov_has_any_tile_above() -> bool:
+	#var floors := _get_floors()
+	#if floors.is_empty():
+		#return false
+#
+	#var idx := _get_current_floor_index()
+	#if idx == -1:
+		#return false
+#
+	#var player_floor := floors[idx] as CanvasItem
+	#var player_z: int = player_floor.z_index
+#
+	## 1) Filtra o FOV pelo is_wall do ANDAR ATUAL
+	#var fov_offsets := get_filtered_fov_offsets_by_walls()
+#
+	## 2) Procura tiles acima APENAS nesses offsets permitidos
+	#for f in floors:
+		#var floor_ci := f as CanvasItem
+		#if floor_ci.z_index <= player_z:
+			#continue
+#
+		#var tms := _get_tilemaps_in_floor(floor_ci)
+		#for tm in tms:
+			#var center := _center_cell_for_tm(tm)
+#
+			#for off in fov_offsets:
+				#var cell: Vector2i = center + off
+				#if _cell_has_any_tile(tm, cell):
+					#print("[FOV_HAS] HIT -> floor=", floor_ci.name, " tm=", tm.name, " off=", off, " cell=", cell)
+					#return true
+#
+	#return false
 
 
 
@@ -436,30 +443,30 @@ func fov_has_any_tile_above() -> bool:
 # VISIBILITY TOGGLE (modo simplificado: “olho”)
 # ============================================================
 
-func _set_floor_children_visible(floor_node: Node, visible: bool) -> void:
-	for ch in floor_node.get_children():
-		# NÃO esconder o player (ele é filho do floor)
-		if ch == self:
-			continue
-		if ch is CanvasItem:
-			(ch as CanvasItem).visible = visible
-
-
-
-func update_fov_floor_visibility() -> void:
-	if floor_manager == null:
-		return
-
-	var has_above := fov_has_any_tile_above() # continua no Player por enquanto
-
-	# seu z_index do PlayerRoot é o "z global" que estamos usando como referência de andar
-	var current_z: int = z_index
-
-	# Regra: se tem qualquer tile acima no FOV -> esconder floors acima
-	
-	floor_manager.set_floors_above_visible_by_player(self, not has_above, player_visual)
-
-	print("[VIS] has_above=", has_above, " current_z=", current_z)
+#func _set_floor_children_visible(floor_node: Node, visible: bool) -> void:
+	#for ch in floor_node.get_children():
+		## NÃO esconder o player (ele é filho do floor)
+		#if ch == self:
+			#continue
+		#if ch is CanvasItem:
+			#(ch as CanvasItem).visible = visible
+#
+#
+#
+#func update_fov_floor_visibility() -> void:
+	#if floor_manager == null:
+		#return
+#
+	#var has_above := fov_has_any_tile_above() # continua no Player por enquanto
+#
+	## seu z_index do PlayerRoot é o "z global" que estamos usando como referência de andar
+	#var current_z: int = z_index
+#
+	## Regra: se tem qualquer tile acima no FOV -> esconder floors acima
+	#
+	#floor_manager.set_floors_above_visible_by_player(self, not has_above, player_visual)
+#
+	#print("[VIS] has_above=", has_above, " current_z=", current_z)
 
 
 
@@ -562,9 +569,9 @@ func change_floor(delta: int) -> void:
 	floor_manager.apply_collision_for_floor(self, current_floor)
 
 	# mantém seu fluxo atual (visibilidade/FOV)
-	update_fov_floor_visibility()
-	if fov_controller != null:
-		fov_controller.update_visibility(self)
+	#update_fov_floor_visibility()
+	#if fov_controller != null:
+		#fov_controller.update_visibility(self)
 
 	#print("[FLOOR] changed -> current_floor=", current_floor, " z=", z_index, " mask_layers=", _bits_to_layers(collision_mask))
 	_dbg_contract("AFTER_CHANGE_FLOOR")
@@ -703,3 +710,11 @@ func _debug() -> void:
 		  " | bin: ", _bits_to_bin(collision_mask))
 
 	print("================================================\n")
+	
+	
+func debug_sqm_position() -> void:
+	var sqm_x := int(floor(global_position.x / TILE_SIZE))
+	var sqm_y := int(floor(global_position.y / TILE_SIZE))
+	var sqm_z := current_floor  # andar lógico
+
+	print("[SQM] x=", sqm_x, " y=", sqm_y, " z=", sqm_z)

@@ -54193,3 +54193,5 @@ script = ExtResource("8_gbfbk")
 
 [node name="FovController" type="Node2D" parent="."]
 script = ExtResource("9_ioo17")
+floor_manager_path = null
+player_visual_path = null
