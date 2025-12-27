@@ -7,6 +7,7 @@ class_name FloorManager
 @export var floors_root_path: NodePath = NodePath("../Floors")
 
 var floors: Array = []  # Array de CanvasItem (floors)
+var _floors_hidden_by_debug := false
 
 func _ready() -> void:
 	refresh_floors()
@@ -56,6 +57,34 @@ func refresh_floors() -> Array:
 		#print("  - ", ci.name, " z=", ci.z_index)
 
 	return floors
+	
+
+
+func toggle_hide_floors_above_player(player: Node) -> void:
+	if floors.is_empty():
+		refresh_floors()
+	if floors.is_empty():
+		return
+
+	var v = player.get("current_floor")
+	if v == null:
+		print("[DEBUG] Player sem current_floor")
+		return
+
+	var player_floor_logical: int = int(v)
+
+	_floors_hidden_by_debug = not _floors_hidden_by_debug
+
+	for f in floors:
+		var ci := f as CanvasItem
+		var floor_logical := z_to_floor_logical(ci.z_index)
+
+		if floor_logical > player_floor_logical:
+			ci.visible = not _floors_hidden_by_debug
+		else:
+			ci.visible = true
+
+
 
 func get_floors() -> Array:
 	if floors.is_empty():
@@ -124,46 +153,45 @@ func change_floor_for_player(
 	if floors.is_empty():
 		return -1
 
-	# floor atual = parent (não soma z do player)
-	var parent_floor := player.get_parent() as CanvasItem
-	if parent_floor == null:
+	# floor atual vem do player (lógico)
+	if not player.has_meta("current_floor") and not ("current_floor" in player):
+		# se você não usa meta, assume que existe a variável current_floor no Player.gd
+		pass
+
+	var old_logical: int = player.current_floor
+	var new_logical: int = old_logical + delta_idx
+
+	# acha os nodes de floor (old/new) pelo logical
+	var old_floor: CanvasItem = null
+	var new_floor: CanvasItem = null
+	for f in floors:
+		var ci := f as CanvasItem
+		if ci == null: continue
+		var fl := z_to_floor_logical(ci.z_index)
+		if fl == old_logical: old_floor = ci
+		if fl == new_logical: new_floor = ci
+
+	if new_floor == null or old_floor == null:
 		return -1
 
-	var old_idx := floors.find(parent_floor)
-	if old_idx == -1:
-		# fallback: tenta pelo z do parent
-		old_idx = get_floor_index_for_global_z(parent_floor.z_index)
-		if old_idx == -1:
-			return -1
-
-	var new_idx := old_idx + delta_idx
-	if new_idx < 0 or new_idx >= floors.size():
-		return -1
-
-	var new_floor := floors[new_idx] as CanvasItem
-	var old_floor := floors[old_idx] as CanvasItem
-	#var new_floor := floors[new_idx] as CanvasItem
-
-	# ✅ COMPENSA O OFFSET VISUAL ENTRE FLOORS (ex: 0,0 / -32,-32 / +32,+32)
+	# compensa o offset visual entre floors (0,0 / -32,-32 / +32,+32...)
 	var delta_off: Vector2 = (new_floor as Node2D).global_position - (old_floor as Node2D).global_position
 	player.global_position += delta_off
-	if "target_position" in player:
-		player.target_position += delta_off
-	# ✅ muda o player de floor de verdade
-	if player.get_parent() != new_floor:
-		player.get_parent().remove_child(player)
-		new_floor.add_child(player)
+	player.target_position += delta_off  # (assumindo que existe no Player)
 
-	# ✅ z_index do player vira só offset local (deixe 0 por enquanto)
-	player.z_index = 0
+	# atualiza referência de floor no player
+	player.current_floor = new_logical
 
-	var floor_logical := z_to_floor_logical(new_floor.z_index)
-	apply_collision_for_floor(player, floor_logical)
+	# z do player vira o z do floor (global)
+	player.z_index = new_floor.z_index
 
-	# mantém seu pipeline de visual/remote
+	# colisão do andar
+	apply_collision_for_floor(player, new_logical)
+
+	# mantém pipeline do visual/remote
 	ensure_visual_on_current_floor(player, player_visual, remote_to_visual)
 
-	return floor_logical
+	return new_logical
 
 	
 

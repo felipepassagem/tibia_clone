@@ -10,7 +10,7 @@ func _ready() -> void:
 	#player = get_parent() as CharacterBody2D
 	if player == null:
 		player = get_tree().current_scene.find_child("Player", true, false) as CharacterBody2D
-	print("[MOVEMENT] player resolved =", player)
+	#print("[MOVEMENT] player resolved =", player)
 
 func tick_physics(delta: float) -> void:
 	if player == null:
@@ -99,7 +99,7 @@ func _start_step(dir: Vector2) -> void:
 # MOVE TOWARDS TARGET
 # ----------------------------
 func _move_towards_target(delta: float) -> void:
-	print("[MOVEMENT] moving | pos =", player.global_position, " -> ", player.target_position)
+	#print("[MOVEMENT] moving | pos =", player.global_position, " -> ", player.target_position)
 	var to_target: Vector2 = player.target_position - player.global_position
 	var is_diagonal: bool = (to_target.x != 0.0 and to_target.y != 0.0)
 
@@ -114,10 +114,13 @@ func _move_towards_target(delta: float) -> void:
 	if to_target.length() <= step_px:
 		player.global_position = player.target_position
 		player.is_moving = false
-
+		if player.has_method("on_step_finished"):
+			player.on_step_finished()
+	
 		if player.has_method("_anim_play_idle"):
 			player._anim_play_idle(player.last_dir)
-
+		if player.has_method("update_floors_by_occlusion"):
+			player.update_floors_by_occlusion()
 		#if player.fov_controller != null:
 			#player.fov_controller.update_visibility(player)
 

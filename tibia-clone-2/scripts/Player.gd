@@ -63,7 +63,8 @@ var _floors_above_hidden: bool = false
 
 func _ready() -> void:
 	print("[PHY] player layer=", collision_layer, " mask=", collision_mask)
-
+	var cast := $OcclusionCast as ShapeCast2D
+	print("[CAST] enabled=", cast.enabled, " target=", cast.target_position)
 	# pega Movement 1 vez e injeta o player 1 vez
 	var m: Node = find_child("Movement", true, false)
 	if m != null and m.has_method("set_player"):
@@ -111,8 +112,60 @@ func _ready() -> void:
 	#if fov_controller != null:
 		#fov_controller.update_visibility(self)
 	_dbg_contract("READY")
+func _resolve_floor_from_collider(col: Object) -> CanvasItem:
+	if col == null:
+		return null
 
+	var n: Node = col as Node
+	while n != null:
+		if n is CanvasItem:
+			var nm := String(n.name).to_lower()
+			if nm.begins_with("floor"):
+				return n as CanvasItem
+		n = n.get_parent()
+
+	return null
 		
+func _get_lowest_hit_upper_floor() -> CanvasItem:
+	var cast := $OcclusionCast as ShapeCast2D
+	cast.force_shapecast_update()
+
+	if not cast.is_colliding():
+		return null
+
+	# floor atual do player (agora que você está movendo o player entre Floors)
+	var current_floor_ci := get_parent() as CanvasItem
+	if current_floor_ci == null:
+		return null
+
+	var player_logical: int = current_floor  # fonte única (você já mantém isso atualizado)
+	var best_floor: CanvasItem = null
+	var best_logical := 999999
+
+	for i in range(cast.get_collision_count()):
+		var col := cast.get_collider(i)
+		var floor_ci := _resolve_floor_from_collider(col)
+		if floor_ci == null:
+			continue
+
+		# ✅ ignora o próprio floor do player
+		if floor_ci == current_floor_ci:
+			continue
+
+		var logical := floor_manager.z_to_floor_logical(floor_ci.z_index)
+
+		# ✅ só acima do player
+		if logical <= player_logical:
+			continue
+
+		# ✅ queremos o MAIS BAIXO acima (menor logical acima)
+		if logical < best_logical:
+			best_logical = logical
+			best_floor = floor_ci
+
+	return best_floor
+
+
 func get_input_dir8() -> Vector2:
 	var x := int(Input.is_action_pressed("ui_right")) - int(Input.is_action_pressed("ui_left"))
 	var y := int(Input.is_action_pressed("ui_down"))  - int(Input.is_action_pressed("ui_up"))
@@ -135,6 +188,7 @@ func _dir8_to_cardinal(dir: Vector2) -> Vector2:
 		return Vector2.RIGHT if dir.x > 0 else Vector2.LEFT
 	else:
 		return Vector2.DOWN if dir.y > 0 else Vector2.UP
+		
 func get_pixels_per_second(is_diagonal: bool) -> float:
 	var px := TILE_SIZE * get_effective_tps()
 	return px * (DIAG_FACTOR if is_diagonal else 1.0)
@@ -177,6 +231,7 @@ func _anim_play_idle(dir: Vector2) -> void:
 
 	if name != "" and anim.animation != name:
 		anim.play(name)
+		
 func _ensure_anim_ref() -> void:
 	if anim != null and is_instance_valid(anim):
 		return
@@ -193,6 +248,10 @@ func _ensure_anim_ref() -> void:
 func _physics_process(delta: float) -> void:
 	if movement != null and movement.has_method("tick_physics"):
 		movement.tick_physics(delta)
+		
+	#var cast := $OcclusionCast as ShapeCast2D
+	#if cast.is_colliding():
+		#print("[CAST] colidiu com:", cast.get_collider(0))
 
 
 func set_facing(dir: Vector2) -> void:
@@ -279,6 +338,9 @@ func _input(event: InputEvent) -> void:
 					print("[FOV] fov_controller NULL")
 			KEY_K:
 				debug_sqm_position()
+			KEY_U:
+				if floor_manager != null:
+					floor_manager.toggle_hide_floors_above_player(self)
 
 
 # ============================================================
@@ -359,9 +421,103 @@ func _world_pos_is_blocked(world_pos: Vector2) -> bool:
 # ============================================================
 # FLOORS DISCOVERY / CURRENT FLOOR
 # ============================================================
+func occlusion_from_upper_floor() -> bool:
+	var cast := $OcclusionCast as ShapeCast2D
+	cast.force_shapecast_update()
+
+	if not cast.is_colliding():
+		return false
+
+	var player_floor := current_floor  # floor lógico do player
+
+	for i in range(cast.get_collision_count()):
+		var col := cast.get_collider(i)
+		if col == null:
+			continue
+
+		# sobe na árvore até achar um FloorXX (CanvasItem)
+		var n := col as Node
+		while n != null and not (n is CanvasItem and String(n.name).to_lower().begins_with("floor")):
+			n = n.get_parent()
+
+		if n == null:
+			continue
+
+		var floor_ci := n as CanvasItem
+		var floor_logical := floor_manager.z_to_floor_logical(floor_ci.z_index)
+
+		if floor_logical > player_floor:
+			print("[OCCLUSION] hit floor", floor_logical, " (player=", player_floor, ")")
+			return true
+
+	return false
 
 
+func on_step_finished() -> void:
+	# aqui vamos chamar o FOV/occlusion depois
+	update_floors_by_occlusion()
+	if has_node("OcclusionCast"):
+		var cast := $OcclusionCast as ShapeCast2D
+		cast.force_shapecast_update()
+		print("[CAST] colliding? ", cast.is_colliding())
+		if occlusion_from_upper_floor():
+			print("Tem andar superior ocluindo")
+		else:
+			print("Visão livre acima")
 
+func _get_first_hit_upper_floor() -> CanvasItem:
+	var cast := $OcclusionCast as ShapeCast2D
+	cast.force_shapecast_update()
+
+	if not cast.is_colliding():
+		return null
+
+	var player_floor := current_floor
+
+	for i in range(cast.get_collision_count()):
+		var col := cast.get_collider(i)
+		if col == null:
+			continue
+
+		# sobe até achar um FloorXX (CanvasItem)
+		var n: Node = col as Node
+		while n != null and not (n is CanvasItem and String(n.name).to_lower().begins_with("floor")):
+			n = n.get_parent()
+
+		if n == null:
+			continue
+
+		var floor_ci := n as CanvasItem
+		var logical := floor_manager.z_to_floor_logical(floor_ci.z_index)
+
+		if logical > player_floor:
+			return floor_ci
+
+	return null
+	
+func update_floors_by_occlusion() -> void:
+	if floor_manager == null:
+		return
+
+	var hit_floor := _get_lowest_hit_upper_floor()
+
+	if hit_floor == null:
+		# nada ocluindo -> mostra tudo acima do player
+		floor_manager.set_floors_above_visible_by_player(self, true, player_visual)
+		return
+
+	var hit_logical := floor_manager.z_to_floor_logical(hit_floor.z_index)
+
+	for f in floor_manager.get_floors():
+		var ci := f as CanvasItem
+		var logical := floor_manager.z_to_floor_logical(ci.z_index)
+
+		# esconde o hit e todos acima
+		ci.visible = (logical < hit_logical)
+
+	# segurança extra
+	if player_visual:
+		player_visual.visible = true
 
 
 
